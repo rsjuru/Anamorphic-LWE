@@ -2,7 +2,7 @@ import math
 import numpy as np
 from termcolor import colored
 
-lam = 2
+lam = 8
 
 
 def sample_uniform_matrix(rows, cols, q):
@@ -229,17 +229,17 @@ def adec(dk, tk, ask, act, par):
 
     return s_final, e
 
-'''
+
 # Generate parameters and keys
-sk, pk = key_gen()
+sk, pk = key_gen(2**16)
 par = pk[0]
 q, p, n, m, l, alpha = par
 
 # Generate message
 mu = np.random.randint(0, p, size=(l, 1), dtype=np.int64)
 print("Value of q: ", q, " and value of p: ", p)
+print("")
 print("Original message: ", mu.T)
-
 # Encrypt message
 ct = enc(pk, mu, p, q)
 print("Encrypted message: ", ct[1].T)
@@ -247,7 +247,6 @@ print("Encrypted message: ", ct[1].T)
 # Decrypt message
 dm = dec(sk, ct, p, q)
 print("Decrypted message: ", dm.T)
-
 # Check that decryption works
 if np.array_equal(mu, dm):
     print(colored("LWE decryption works!", "green"))
@@ -255,9 +254,20 @@ else:
     print(colored("LWE decryption fails!", "red"))
 
 # Generate anamorphic parameters and keys
-ask, apk, dk, tk = akey_gen()
+ask, apk, dk, tk = akey_gen(2**16)
 par = apk[0]
 q, p, n, m, l, alpha = par
+
+mu = np.random.randint(0, p, size=(l, 1), dtype=np.int64)
+ct = enc(apk, mu, p, q)
+dm = dec(ask, ct, p, q)
+print("")
+print("Original message: ", mu.T)
+print("Decrypted message: ", dm.T)
+if np.array_equal(mu, dm):
+    print(colored("LWE decryption with anamorphic public and private key works!", "green"))
+else:
+    print(colored("LWE decryption with anamorphic public and private key fails!", "red"))
 
 # Generate regular and anamorphic messages
 mu = np.random.randint(0, p, size=(l, 1), dtype=np.int64)
@@ -266,6 +276,7 @@ s_mu = np.random.randint(0, p, size=(l, 1), dtype=np.int64)
 c0, c1 = aenc(apk, dk, mu, s_mu)
 adm, e = adec(dk, tk, ask, (c0, c1), par)
 
+print("")
 print("Original anamorphic message: ", s_mu.T)
 print("Decrypted anamorphic message: ", adm.T)
 
@@ -278,7 +289,7 @@ else:
 
 # Decrypt anamorphic ciphertext with regular LWE decryption
 m_am = dec(ask, (c0, c1), p, q)
-
+print("")
 print("Original message: ", mu.T)
 print("Message encrypted from anamorphic ciphertext: ", m_am.T)
 
@@ -288,4 +299,3 @@ if np.array_equal(mu, m_am):
     print(colored("LWE Decryption works on anamorphic ciphertext!", "green"))
 else:
     print(colored("LWE decryption does not work on anamorphic ciphertext!", "red"))
-'''
