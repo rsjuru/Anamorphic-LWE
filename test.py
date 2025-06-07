@@ -1,8 +1,8 @@
 from lwe import *
-
+import numpy as np
 
 def run_tests():
-    print("q\tLWE_Fail\tAnamorphic_Fail\tLWE_from_apk_Fail\tAnaEnc_RegDec_Fail")
+    print("q\tLWE_Fail(%)\tAnamorphic_Fail(%)\tLWE_from_apk_Fail(%)\tAnaEnc_RegDec_Fail(%)")
 
     for exp in range(5, 21):  # q = 2^5 to 2^20
         q = 2**exp
@@ -11,7 +11,8 @@ def run_tests():
         lwe_from_apk_failures = 0
         anaenc_regdec_failures = 0
 
-        for _ in range(100):
+        runs = 100
+        for _ in range(runs):
             # LWE Test
             try:
                 sk, pk = key_gen(q)
@@ -59,7 +60,17 @@ def run_tests():
             except Exception:
                 anaenc_regdec_failures += 1
 
-        print(f"{('2^' + str(exp)):<6} {lwe_failures:<12} {anamorphic_failures:<16} {lwe_from_apk_failures:<20} {anaenc_regdec_failures:<20}")
+        # Calculate percentages
+        lwe_pct = round((lwe_failures / runs) * 100)
+        anamorphic_pct = round((anamorphic_failures / runs) * 100)
+        lwe_from_apk_pct = round((lwe_from_apk_failures / runs) * 100)
+        anaenc_regdec_pct = round((anaenc_regdec_failures / runs) * 100)
+
+        print(f"{('2^' + str(exp)):<6} "
+              f"{(str(lwe_pct) + '%'):<14}"
+              f"{(str(anamorphic_pct) + '%'):<22}"
+              f"{(str(lwe_from_apk_pct) + '%'):<26}"
+              f"{(str(anaenc_regdec_pct) + '%'):<26}")
 
 
 if __name__ == "__main__":
