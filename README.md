@@ -37,15 +37,25 @@ using regular decryption.
 
 The results of the decryption are printed in the terminal (either decryption was successful or not).
 
-## Testing the Program
+## Benchmarking the Program
 
 --- 
-To run tests for suitable q value, you can execute the following command:
+To get the benchmarking of key generation, encryption and decryption (regular and anamorphic),
+run the following command:
 
+    python benchmarks.py
+
+This will run regular and anamorphic key generation, encryption and decryption 100 times and calculate
+average time of each operation in milliseconds. Round amound can be changed by just changing the value
+of REPEATS in the code. 
+
+To test for correctness of decryption, run following script:
+    
     python test.py
 
-This will run regular and anamorphic encryption/decryption process defined amount of times (default 100 times) and gives
-result of how many times decryption fails. 
+This will run encryption and decryption, default by 100 times, with q values from 2^5 to 2^20 and 
+inform the percentage of failing decryptions. 
 
-Rounds are run with different q values from 2<sup>5</sup> to 2<sup>20</sup>. The amount of the rounds can be changed
-directly at the code. 
+Code tests regular encryption/decryption, anamorphic encryption/decryption, 
+regular encryption/decryption with anamorphic public/private key pair and regular decryption from anamorphic ciphertext. 
+
