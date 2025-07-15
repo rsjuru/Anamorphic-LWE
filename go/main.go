@@ -746,7 +746,7 @@ func matEqual(a, b *mat.VecDense) bool {
 	return true
 }
 
-func main() {
+func test_scheme() {
 	rand.Seed(time.Now().UnixNano())
 
 	// Generate parameters and keys
@@ -816,5 +816,9 @@ func main() {
 	} else {
 		fmt.Println("LWE decryption does not work on anamorphic ciphertext! ❌")
 	}
+}
 
+func main() {
+	// test_scheme()
+	RunLWEBenchmark()
 }
