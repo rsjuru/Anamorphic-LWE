@@ -6,7 +6,6 @@
 
 ---
 This folder contains Python implementations of the anamorphic primal and anamorphic dual Regev cryptosystems (based on LWE).
----
 
 ## Notes
 
