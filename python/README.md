@@ -1,28 +1,21 @@
 # Python Version of anamorphic primal and dual Regev 
 
----
-
 ## Description 
 
----
 This folder contains Python implementations of the anamorphic primal and anamorphic dual Regev cryptosystems (based on LWE).
 
 ## Notes
 
----
-1. Primal and dual Regev are implemente in separate folders.
+1. Primal and dual Regev are implemented in separate folders.
 2. The LWE parameters for each scheme can be modified directly in the source code.
---- 
+
 ## Requirements
 
----
 To run the programs, you need Numpy and Termcolor packages. You can install them using pip:
 
     pip install numpy termcolor
 
 ## Running the Programs
-
----
 
 ### Primal Regev
 
@@ -42,8 +35,6 @@ Run the dual Regev scheme from the /dualRegev directory with:
 The dual Regev implementation provides the same functionality as the primal Regev scheme. 
 
 ## Benchmarking the Programs
-
---- 
 
 ### Benchmarking Performance
 
@@ -68,5 +59,3 @@ The test cover:
 - Anamorphic encryption/decryption
 - Regular encryption/decryption with an anamorphic public/private key pair
 - Regular decryption from an anamorpic ciphertext
-
-
