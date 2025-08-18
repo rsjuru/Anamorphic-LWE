@@ -10,7 +10,4 @@ Asymmetric Anamorphic Homomorphic Encryption from LWE by Amit Deo and  Benoıt L
 
 There are both Python and Go versions of these two anamorphic cryptosystems. Both files (/python and /go) include detailed data about executing
 the programs in their own README files. 
----
-
-
 
