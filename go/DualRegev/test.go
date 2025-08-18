@@ -1,0 +1,122 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"math/big"
+	"time"
+)
+
+const QLIMIT = 129
+
+func runTests() {
+
+	for i := 1; i < QLIMIT; i++ {
+		i64 := int64(i)
+		q := new(big.Int).Exp(big.NewInt(2), big.NewInt(i64), nil)
+
+		bytes := map[string][]int{
+			"pk":  {},
+			"sk":  {},
+			"ct":  {},
+			"dm":  {},
+			"apk": {},
+			"ask": {},
+			"tk":  {},
+			"act": {},
+			"adm": {},
+		}
+
+		times := map[string][]float64{
+			"kgen": {},
+			"agen": {},
+			"enc":  {},
+			"aenc": {},
+			"dec":  {},
+			"adec": {},
+		}
+
+		for j := 0; j < RUNS; j++ {
+			t0 := time.Now()
+			sk, pk := kgen(q)
+			t1 := time.Since(t0).Seconds()
+			times["kgen"] = append(times["kgen"], t1)
+			pkBytes, _ := json.Marshal(pk)
+			skBytes, _ := json.Marshal(sk)
+			bytes["pk"] = append(bytes["pk"], len(pkBytes))
+			bytes["sk"] = append(bytes["sk"], len(skBytes))
+
+			par := pk.Params
+			mu := sampleMatrix(par.n, 1, par.p)
+			t0 = time.Now()
+			ct := enc(pk, mu)
+			t1 = time.Since(t0).Seconds()
+			times["enc"] = append(times["enc"], t1)
+			ctBytes, _ := json.Marshal(ct)
+			bytes["ct"] = append(bytes["ct"], len(ctBytes))
+
+			t0 = time.Now()
+			dm := dec(par, sk, ct)
+			t1 = time.Since(t0).Seconds()
+			times["dec"] = append(times["dec"], t1)
+			dmBytes, _ := json.Marshal(dm)
+			bytes["dm"] = append(bytes["dm"], len(dmBytes))
+
+			t0 = time.Now()
+			apk, ask, tk := agen(q)
+			t1 = time.Since(t0).Seconds()
+			times["agen"] = append(times["agen"], t1)
+			apkBytes, _ := json.Marshal(apk)
+			askBytes, _ := json.Marshal(ask)
+			tkBytes, _ := json.Marshal(tk)
+			bytes["apk"] = append(bytes["apk"], len(apkBytes))
+			bytes["ask"] = append(bytes["ask"], len(askBytes))
+			bytes["tk"] = append(bytes["tk"], len(tkBytes))
+
+			par = apk.Params
+			amu := sampleMatrix(par.n, 1, par.p)
+			t0 = time.Now()
+			act := aenc(apk, mu, amu)
+			t1 = time.Since(t0).Seconds()
+			times["aenc"] = append(times["aenc"], t1)
+			actBytes, _ := json.Marshal(act)
+			bytes["act"] = append(bytes["act"], len(actBytes))
+
+			t0 = time.Now()
+			adm := adec(apk, tk, ask, act)
+			t1 = time.Since(t0).Seconds()
+			times["adec"] = append(times["adec"], t1)
+			admBytes, _ := json.Marshal(adm)
+			bytes["adm"] = append(bytes["adm"], len(admBytes))
+		}
+		fmt.Printf("q = 2^%d = %s\n", i, q.String())
+		fmt.Println("Average times (seconds):")
+
+		offset := len(times["kgen"]) - RUNS
+
+		// Print average times
+		for key, list := range times {
+			sum := 0.0
+			for j := offset; j < offset+RUNS; j++ {
+				sum += list[j]
+			}
+			avg := sum / float64(RUNS)
+			fmt.Printf("  %-5s : %.6f\n", key, avg)
+		}
+		fmt.Println("Average sizes (bytes):")
+
+		// Print average byte sizes
+		for key, list := range bytes {
+			sum := 0
+			for j := offset; j < offset+RUNS; j++ {
+				sum += list[j]
+			}
+			avg := float64(sum) / float64(RUNS)
+			fmt.Printf("  %-5s : %.2f\n", key, avg)
+		}
+
+		fmt.Println("----------------------------------")
+
+	}
+
+}
