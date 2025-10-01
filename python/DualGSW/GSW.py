@@ -40,6 +40,8 @@ def sample_matrix_p(m, n):
     return matrix
 
 
+# ----------------- Gadget Functions -----------------
+
 def gadget_matrix(n, k, q):
     """
     Construct the gadget matrix G of size n*k, defined as:
@@ -50,7 +52,6 @@ def gadget_matrix(n, k, q):
     G = np.kron(np.eye(n, dtype= int), g) % q
     return G
 
-# ----------------- Gadget Functions -----------------
 
 def gadget_inverse(vec, q, base=2):
     """
