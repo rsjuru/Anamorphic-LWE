@@ -1,6 +1,7 @@
-package main
+package DualRegev
 
 import (
+	"anamorphicLWE/matrix"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -12,7 +13,7 @@ const LAMLIMIT = 128
 
 const RUNS = 10
 
-func testLambda() {
+func TestLambda() {
 
 	for i := 0; i < LAMLIMIT; i++ {
 		lam = 1 << i
@@ -40,7 +41,7 @@ func testLambda() {
 		for j := 0; j < RUNS; j++ {
 			fmt.Println(j)
 			t0 := time.Now()
-			sk, pk := kgen(q)
+			sk, pk := KGen(q)
 			t1 := time.Since(t0).Seconds()
 			times["kgen"] = append(times["kgen"], t1)
 			pkBytes, _ := json.Marshal(pk)
@@ -49,23 +50,23 @@ func testLambda() {
 			bytes["sk"] = append(bytes["sk"], len(skBytes))
 
 			par := pk.Params
-			mu := sampleMatrix(par.n, 1, par.p)
+			mu := matrix.SampleMatrix(par.N, 1, par.P)
 			t0 = time.Now()
-			ct := enc(pk, mu)
+			ct := Enc(pk, mu)
 			t1 = time.Since(t0).Seconds()
 			times["enc"] = append(times["enc"], t1)
 			ctBytes, _ := json.Marshal(ct)
 			bytes["ct"] = append(bytes["ct"], len(ctBytes))
 
 			t0 = time.Now()
-			dm := dec(par, sk, ct)
+			dm := Dec(par, sk, ct)
 			t1 = time.Since(t0).Seconds()
 			times["dec"] = append(times["dec"], t1)
 			dmBytes, _ := json.Marshal(dm)
 			bytes["dm"] = append(bytes["dm"], len(dmBytes))
 
 			t0 = time.Now()
-			apk, ask, tk := agen(q)
+			apk, ask, tk := AGen(q)
 			t1 = time.Since(t0).Seconds()
 			times["agen"] = append(times["agen"], t1)
 			apkBytes, _ := json.Marshal(apk)
@@ -76,16 +77,16 @@ func testLambda() {
 			bytes["tk"] = append(bytes["tk"], len(tkBytes))
 
 			par = apk.Params
-			amu := sampleMatrix(par.n, 1, par.p)
+			amu := matrix.SampleMatrix(par.N, 1, par.P)
 			t0 = time.Now()
-			act := aenc(apk, mu, amu)
+			act := AEnc(apk, mu, amu)
 			t1 = time.Since(t0).Seconds()
 			times["aenc"] = append(times["aenc"], t1)
 			actBytes, _ := json.Marshal(act)
 			bytes["act"] = append(bytes["act"], len(actBytes))
 
 			t0 = time.Now()
-			adm := adec(apk, tk, ask, act)
+			adm := ADec(apk, tk, ask, act)
 			t1 = time.Since(t0).Seconds()
 			times["adec"] = append(times["adec"], t1)
 			admBytes, _ := json.Marshal(adm)

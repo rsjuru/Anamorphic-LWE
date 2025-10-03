@@ -1,0 +1,3 @@
+module anamorphicLWE
+
+go 1.24.3
