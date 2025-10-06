@@ -19,9 +19,15 @@ var rng = mrand.New(mrand.NewSource(time.Now().UnixNano()))
 // Generates a random matrix of size (rows x cols)
 // with entries uniformly sampled from Z_q (integers modulo q).
 func SampleMatrix(rows, cols int, q *big.Int) BigIntMatrix {
+	// Allocate the outer slice for the matrix with 'rows' number of rows.
 	matrix := make(BigIntMatrix, rows)
+
+	// Loop over each row index.
 	for i := 0; i < rows; i++ {
+		// Allocate a slice for the current row with 'cols' number of columns.
 		matrix[i] = make([]*big.Int, cols)
+
+		// Fill each element of the current row.
 		for j := 0; j < cols; j++ {
 			// Sample uniformly at random in [0, q-1]
 			matrix[i][j] = new(big.Int).Rand(rng, q)
@@ -34,10 +40,15 @@ func SampleMatrix(rows, cols int, q *big.Int) BigIntMatrix {
 // is sampled from a discrete Gaussian (normal) distribution
 // with mean 0 and given standard deviation (stddev).
 func SampleError(rows, cols int, stddev float64, mod *big.Int) BigIntMatrix {
+	// Allocate memory for the current row with 'cols' number of columns.
 	matrix := make(BigIntMatrix, rows)
 
+	// Loop through each row.
 	for i := 0; i < rows; i++ {
 		matrix[i] = make([]*big.Int, cols)
+		// Allocate memory for the current row with 'cols' number of columns.
+
+		// Generate Gaussian samples for each element in the row.
 		for j := 0; j < cols; j++ {
 			// Draw a sample from N(0, stddev^2)
 			x := rng.NormFloat64() * stddev
@@ -52,17 +63,26 @@ func SampleError(rows, cols int, stddev float64, mod *big.Int) BigIntMatrix {
 	return matrix
 }
 
-// SampleMatrixP generates an m × n matrix where each entry is from P = {-1:1/4, 0:1/2, +1:1/4}
+// SampleMatrixP generates an m × n matrix where
+// each entry is from P = {-1:1/4, 0:1/2, +1:1/4}
 func SampleMatrixP(m, n int) BigIntMatrix {
+	// Allocate the outer slice for the matrix with 'm' rows.
 	matrix := make([][]*big.Int, m)
+
+	// Iterate over each row.
 	for i := 0; i < m; i++ {
+		// Allocate the inner slice for the current row with 'n' columns.
 		row := make([]*big.Int, n)
+
+		// Fill teh row with sampled values.
 		for j := 0; j < n; j++ {
 			// Sample from {0, 1, 2, 3} and map to {-1, 0, 1}
 			randVal, err := rand.Int(rand.Reader, big.NewInt(4))
 			if err != nil {
 				log.Fatalf("crand.Int error: %v", err)
 			}
+
+			// Map r to {-1, 0, 1} according to the defined probabilites.
 			switch randVal.Int64() {
 			case 0, 1:
 				row[j] = big.NewInt(0)
@@ -72,6 +92,8 @@ func SampleMatrixP(m, n int) BigIntMatrix {
 				row[j] = big.NewInt(1)
 			}
 		}
+
+		// Store the row in the matrix
 		matrix[i] = row
 	}
 	return matrix
@@ -136,11 +158,14 @@ func MultiplyMatricesParallel(a, b BigIntMatrix, mod *big.Int) BigIntMatrix {
 	return result
 }
 
+// Returns the transpose of a given matrix.
 func Transpose(matrix BigIntMatrix) BigIntMatrix {
+	// Handle empty matrix cases to avoid intex out-of-range errors.
 	if len(matrix) == 0 || len(matrix[0]) == 0 {
 		return nil
 	}
 
+	// Determine the number of rows and columns in the input matrix.
 	rows := len(matrix)
 	cols := len(matrix[0])
 
@@ -362,6 +387,7 @@ func GadgetMatrixParallel(n, k int, q *big.Int) BigIntMatrix {
 	return G
 }
 
+// Computer the gadget inverse (or base decomposition) of a vector over Zq.
 func GadgetInverse(vec []*big.Int, q *big.Int, base int64) BigIntMatrix {
 
 	// Compute k = ceil(log_base(q))
@@ -369,21 +395,31 @@ func GadgetInverse(vec []*big.Int, q *big.Int, base int64) BigIntMatrix {
 	qf, _ := new(big.Float).SetInt(q).Float64()
 	k := int(math.Ceil(math.Log(qf) / math.Log(float64(base))))
 
+	// Prepare a slice to hold all decomposed digits.
 	digits := make([]*big.Int, 0, len(vec)*k)
 
 	baseBig := big.NewInt(base)
 
+	// Decompose each element of vec into base-'base' digits
 	for _, x := range vec {
-		y := new(big.Int).Set(x)
+		y := new(big.Int).Set(x) // make a copy so we don't modify input
+
 		for i := 0; i < k; i++ {
+			// Compute least significant digit: y mod base
 			digit := new(big.Int).Mod(y, baseBig)
+
+			// Append the digit to the digit list
 			digits = append(digits, digit)
+
+			// Integer division: y = y / base
 			y.Div(y, baseBig)
 		}
 	}
 
+	// Convert the digit list into a column matrix
 	res := make(BigIntMatrix, len(digits))
 	for i := range digits {
+		// Each row contains a single digit as a 1-column matrix
 		res[i] = []*big.Int{digits[i]}
 	}
 
@@ -392,20 +428,27 @@ func GadgetInverse(vec []*big.Int, q *big.Int, base int64) BigIntMatrix {
 
 // RoundDiv returns ⌊a/b⌉ (round to nearest integer).
 func RoundDiv(a, b *big.Int) *big.Int {
+	// Compute integer division with remainder: a = b*q + r
 	q, r := new(big.Int), new(big.Int)
 	q.QuoRem(a, b, r) // q = a/b (truncated), r = remainder
 
-	// If remainder >= b/2, round up
+	// Compute half of the divisor (b/2) for rounding comparison
 	half := new(big.Int).Div(b, big.NewInt(2))
+
+	// If remainder ≥ b/2, increment q to round up
 	if r.Cmp(half) >= 0 {
 		q.Add(q, big.NewInt(1))
 	}
 	return q
 }
 
+// Computers (A-B) mod q int parallel, where A
+// and B are matrices of the same dimensions.
 func SubtractMatricesParallel(a, b BigIntMatrix, mod *big.Int) BigIntMatrix {
 	rows := len(a)
 	cols := len(a[0])
+
+	// Allocate memory for the result matrix
 	result := make(BigIntMatrix, rows)
 	for i := range result {
 		result[i] = make([]*big.Int, cols)
@@ -414,10 +457,12 @@ func SubtractMatricesParallel(a, b BigIntMatrix, mod *big.Int) BigIntMatrix {
 		}
 	}
 
-	numWorkers := 8
+	// COnfigure parallelization
+	numWorkers := 8 // number of concurrent goroutines
 	batchSize := (rows + numWorkers - 1) / numWorkers
 	var wg sync.WaitGroup
 
+	// Process each chunk of rows in parallel
 	for w := 0; w < numWorkers; w++ {
 		start := w * batchSize
 		end := start + batchSize
@@ -432,10 +477,14 @@ func SubtractMatricesParallel(a, b BigIntMatrix, mod *big.Int) BigIntMatrix {
 		go func(start, end int) {
 			defer wg.Done()
 			diff := new(big.Int)
+
+			// Iterate through assigned rows and compute (a-b) mod q
 			for i := start; i < end; i++ {
 				for j := 0; j < cols; j++ {
+					// diff = a[i][j] - b[i][j]
 					diff.Sub(a[i][j], b[i][j])
-					// Ensure positive mod
+
+					// Reduce modulo q (ensure non-negative result)
 					result[i][j].Mod(diff, mod)
 					if result[i][j].Sign() < 0 {
 						result[i][j].Add(result[i][j], mod)
@@ -445,12 +494,16 @@ func SubtractMatricesParallel(a, b BigIntMatrix, mod *big.Int) BigIntMatrix {
 		}(start, end)
 	}
 
+	// Wait for all worker goroutines to finish
 	wg.Wait()
 	return result
 }
 
+// Returns ⌈log₂(x)⌉ for a positive big integer x.
 func Log2BigInt(x *big.Int) int {
+	// Get the bit length of x.
 	bitLen := x.BitLen()
+
 	// Check if x is a power of 2
 	if new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(bitLen-1)), nil).Cmp(x) == 0 {
 		return bitLen - 1
@@ -458,15 +511,16 @@ func Log2BigInt(x *big.Int) int {
 	return bitLen
 }
 
+// Constructs the block matrix S = Iₙ ⊗ Sₖ (Kronecker product) in parallel
 func CalculateSMatrixParallel(k, n int, q *big.Int) BigIntMatrix {
-	// Step 1: Create qBits vector of k least significant bits of q
+	// Create qBits vector of k least significant bits of q
 	qBits := make([]*big.Int, k)
 	for i := 0; i < k; i++ {
 		bit := q.Bit(i)
 		qBits[i] = big.NewInt(int64(bit))
 	}
 
-	// Step 2: Construct Sk matrix (k x k)
+	// Construct Sk matrix (k x k)
 	Sk := make(BigIntMatrix, k)
 	for i := 0; i < k; i++ {
 		Sk[i] = make([]*big.Int, k)
@@ -476,15 +530,15 @@ func CalculateSMatrixParallel(k, n int, q *big.Int) BigIntMatrix {
 	}
 	for i := 0; i < k; i++ {
 		if i > 0 {
-			Sk[i][i-1] = big.NewInt(-1)
+			Sk[i][i-1] = big.NewInt(-1) // Subdiagonal
 		}
 		if i < k-1 {
-			Sk[i][i] = big.NewInt(2)
+			Sk[i][i] = big.NewInt(2) // Main diagonal
 		}
-		Sk[i][k-1] = new(big.Int).Set(qBits[i])
+		Sk[i][k-1] = new(big.Int).Set(qBits[i]) // Last column from qBits
 	}
 
-	// Step 3: Initialize output S of size (n*k) x (n*k)
+	// Initialize output S of size (n*k) x (n*k)
 	rows := n * k
 	cols := n * k
 	S := make(BigIntMatrix, rows)
@@ -495,13 +549,14 @@ func CalculateSMatrixParallel(k, n int, q *big.Int) BigIntMatrix {
 		}
 	}
 
-	// Step 4: Parallelize the Kronecker product
+	// Parallelize the Kronecker product
 	numWorkers := 8
 	type task struct{ i, j int }
 
 	tasks := make(chan task, n*n)
 	var wg sync.WaitGroup
 
+	// Worker goroutines copy Sₖ into the correct diagonal block position.
 	for w := 0; w < numWorkers; w++ {
 		wg.Add(1)
 		go func() {
@@ -519,17 +574,21 @@ func CalculateSMatrixParallel(k, n int, q *big.Int) BigIntMatrix {
 		}()
 	}
 
-	// Enqueue tasks
+	// Enqueue diagonal tasks (only where Iₙ has 1s)
 	for i := 0; i < n; i++ {
 		tasks <- task{i, i} // Only the diagonal (since I is identity)
 	}
 	close(tasks)
+
+	// Wait for all goroutines to finish
 	wg.Wait()
 
 	return S
 }
 
+// Returns a submatrix of the input matrix.
 func SliceBigIntMatrixColRange(matrix BigIntMatrix, rowStart, rowEnd, colStart, colEnd int) BigIntMatrix {
+	// Validate row and column ranges
 	if rowStart < 0 || rowEnd > len(matrix) || rowStart > rowEnd {
 		panic("invalid row range")
 	}
@@ -537,41 +596,66 @@ func SliceBigIntMatrixColRange(matrix BigIntMatrix, rowStart, rowEnd, colStart, 
 		panic("invalid column range")
 	}
 
+	// Allocate the new submatrix
 	sliced := make(BigIntMatrix, rowEnd-rowStart)
+
+	// Copy elements (deep copy) from the original matrix
 	for i := rowStart; i < rowEnd; i++ {
 		row := make([]*big.Int, colEnd-colStart)
 		for j := colStart; j < colEnd; j++ {
-			row[j-colStart] = new(big.Int).Set(matrix[i][j]) // deep copy
+			// Deep copy: create a new *big.Int for each element
+			row[j-colStart] = new(big.Int).Set(matrix[i][j])
 		}
 		sliced[i-rowStart] = row
 	}
 	return sliced
 }
 
+// Extracts the k-th "block column" from a block-structured matrix
+// Gs and returns it as an n x 1 column vector
 func RecoverKthColumn(Gs BigIntMatrix, k int, n int) BigIntMatrix {
+	// Allocate output column vector
 	s := make(BigIntMatrix, n)
+
+	// Iterate over each block to extract the element in the k-th column
 	for i := 0; i < n; i++ {
-		s[i] = []*big.Int{new(big.Int).Set(Gs[i*k][0])} // deep copy
+		// Deep copy the element from row i*k, column 0
+		s[i] = []*big.Int{new(big.Int).Set(Gs[i*k][0])}
 	}
 	return s
 }
 
+// Scales each element of a matrix by p/q and rounds to
+// the nearest integer modulo p.
 func ScaleAndRoundMatrix(a BigIntMatrix, p, q *big.Int) BigIntMatrix {
 	rows := len(a)
 	cols := len(a[0])
+
+	// Allocate output matrix
 	result := make(BigIntMatrix, rows)
 
+	// Convert p and q to big.Float for accurate division
 	pf := new(big.Float).SetInt(p)
 	qf := new(big.Float).SetInt(q)
 
+	// Iterate over all elements
 	for i := 0; i < rows; i++ {
 		result[i] = make([]*big.Int, cols)
 		for j := 0; j < cols; j++ {
+			// Covert element to float
 			val := new(big.Float).SetInt(a[i][j])
+
+			// Scale: val * p/q
 			scaled := new(big.Float).Quo(new(big.Float).Mul(val, pf), qf)
+
+			// Round to nearest integer: add 0.5 before truncation
 			rounded := new(big.Float).Add(scaled, big.NewFloat(0.5))
+
+			// Convert back to big.Int
 			intVal := new(big.Int)
 			rounded.Int(intVal)
+
+			// Reduce modulo p, ensuring non-negative result
 			intVal.Mod(intVal, p)
 			if intVal.Sign() < 0 {
 				intVal.Add(intVal, p)
