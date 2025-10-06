@@ -1,4 +1,4 @@
-package dualGSW
+package DualGSW
 
 import (
 	"anamorphicLWE/matrix"
@@ -36,8 +36,12 @@ const L = 3
 
 // Extracts the first column of a matrix and returns it as a vector
 func flattenMatrix(mat matrix.BigIntMatrix) []*big.Int {
-	n := len(mat) // number of rows
+	n := len(mat) // number of rows in the matrix
+
+	// Allocate a slice to hold the first column
 	res := make([]*big.Int, n)
+
+	// Copy each element from the first column of each row
 	for i := 0; i < n; i++ {
 		// Copy the value from the first column of each row
 		res[i] = new(big.Int).Set(mat[i][0])
@@ -45,26 +49,33 @@ func flattenMatrix(mat matrix.BigIntMatrix) []*big.Int {
 	return res
 }
 
+// Generates the cryptographic parameters for a scheme
+// based on a modulus q.
 func genParameters(q *big.Int) Parameters {
+	// Seed the math/rand pseudo-random generator
 	mrand.Seed(time.Now().UnixNano())
 
+	// Define key dimensions and plaintext modulus
 	n := lambda * 2
 	p := big.NewInt(256) // plaintext modulus
 	k := int(math.Ceil(math.Log2(float64(q.Int64()))))
 	m := 10 * n
 
+	// Randomize n0 within safe bounds
 	upperLimit := int(math.Floor(float64(m)/2.0 - math.Ceil(math.Sqrt(float64(lambda*m)/2.0))))
 	if upperLimit < 2 {
 		upperLimit = 2
 	}
-
 	n0 := mrand.Intn(upperLimit-1) + 2
+
+	// Ensure that m is sufficiently large for the system to be solvable
 	if m-n0 <= n*k+2*lambda {
 		m = n*k + 2*lambda + n0 + 1
 	}
 
-	alpha := 1.0 / (2.0 * float64(q.Int64()))
-	sigma := 1.0
+	// Define noise parameters
+	alpha := 1.0 / (2.0 * float64(q.Int64())) // relative error bound
+	sigma := 1.0                              // standard deviation for Gaussian noise
 
 	return Parameters{
 		Q:     q,
@@ -78,7 +89,10 @@ func genParameters(q *big.Int) Parameters {
 	}
 }
 
+// Generates a secret key and a correspoinding public key
+// for a lattice-based scheme.
 func KGen(q *big.Int) (sk matrix.BigIntMatrix, pk PublicKey) {
+	// Generate cryptographic parameters
 	par := genParameters(q)
 
 	// Sample uniform matrix A (n x m)
@@ -98,15 +112,20 @@ func KGen(q *big.Int) (sk matrix.BigIntMatrix, pk PublicKey) {
 	cols := len(A_T[0])
 
 	B := make(matrix.BigIntMatrix, rowsA+rowsAs)
+
+	// Copy A^T into the top rows of B
 	for i := 0; i < rowsA; i++ {
 		B[i] = make([]*big.Int, cols)
 		copy(B[i], A_T[i])
 	}
+
+	// Copy As into the bottom row(s) of B
 	for i := 0; i < rowsAs; i++ {
 		B[rowsA+i] = make([]*big.Int, cols)
 		copy(B[rowsA+i], As[i])
 	}
 
+	// Assign public and secret key
 	pk.Par = par
 	pk.B = B
 	sk = s
@@ -114,13 +133,13 @@ func KGen(q *big.Int) (sk matrix.BigIntMatrix, pk PublicKey) {
 	return
 }
 
+// Generates key set for anamorphic dual GSW scheme.
 func AGen(q *big.Int) *AKeySet {
-	// Generate parameters
+	// Generate cryptographic parameters and secret vector s
 	par := genParameters(q)
-
 	s := matrix.SampleMatrixP(par.M, 1)
 
-	// Find zero positions in s
+	// Identify zero positions in s (needed for trapdoor construction)
 	J := []int{}
 	for i := 0; i < par.M; i++ {
 		if s[i][0].Cmp(big.NewInt(0)) == 0 {
@@ -137,7 +156,7 @@ func AGen(q *big.Int) *AKeySet {
 	mrand.Shuffle(len(J), func(i, j int) { J[i], J[j] = J[j], J[i] })
 	I := J[:par.N0]
 
-	// Construct A_har (size n x n0)
+	// Construct intermediate matrix A_hat (size n x n0)
 	// A0: n x (n0-1)
 	A0 := matrix.SampleMatrix(par.N, par.N0-1, par.Q)
 	tPrime := matrix.SampleError(par.N0-1, 1, 0.5, par.Q)
@@ -147,20 +166,18 @@ func AGen(q *big.Int) *AKeySet {
 	A0T := matrix.Transpose(A0)
 	tPrimeT := matrix.Transpose(tPrime)
 	eIT := matrix.Transpose(eI)
-	// fmt.Println("Size of A0:", len(A0), "x", len(A0[0]))
-	// fmt.Println("Size of tPrimeT:", len(tPrimeT), "x", len(tPrimeT[0]))
 	AOtPrime := matrix.MultiplyMatricesParallel(tPrimeT, A0T, par.Q)
 	sum := matrix.AddMatrices(AOtPrime, eIT, par.Q)
 	A_hat := matrix.AppendRows(A0T, sum)
-	A_hatT := matrix.Transpose(A_hat)
+	A_hatT := matrix.Transpose(A_hat) // transpose for column assignement
 
-	// Random A: n x m
+	// Initialize random matrix A: n x m
 	A := matrix.SampleMatrix(par.N, par.M, par.Q)
 
 	// Assign selected columns from A_hat into A
 	for j := 0; j < par.N0; j++ {
 		for row := 0; row < par.N; row++ {
-			A[row][I[j]] = A_hatT[row][j]
+			A[row][I[j]] = A_hatT[row][j] // insert A_hat columns at indices I
 		}
 	}
 
@@ -168,32 +185,36 @@ func AGen(q *big.Int) *AKeySet {
 	t := make(matrix.BigIntMatrix, par.M)
 	for i := 0; i < par.M; i++ {
 		t[i] = make([]*big.Int, 1)
-		t[i][0] = big.NewInt(0)
+		t[i][0] = big.NewInt(0) // initialize to 0
 	}
 
 	for j := 0; j < par.N0-1; j++ {
 		idx := I[j]
-		neg := new(big.Int).Neg(tPrime[j][0])
+		neg := new(big.Int).Neg(tPrime[j][0]) // negative tPrime
 		t[idx][0] = neg
 	}
-	// last trapdoor index
+	// last trapdoor index set to 1
 	t[I[par.N0-1]][0] = big.NewInt(1)
 
 	// build public matrix B
 	AT := matrix.Transpose(A)
 	sT := matrix.Transpose(s)
 	As := matrix.MultiplyMatricesParallel(sT, AT, par.Q)
-
 	B := matrix.AppendRows(AT, As)
+
+	// Construct public key struct
 	apk := PublicKey{Par: par, B: B}
 
 	return &AKeySet{Ask: s, Apk: apk, Dk: I, Tk: t}
 }
 
+// Encrypts a plaintext message mu using the public key pk.
 func Enc(pk PublicKey, mu *big.Int) matrix.BigIntMatrix {
 	par := pk.Par
+
+	// Compute the gadget dimension parameter k
 	k := int(math.Ceil(math.Log2(float64(par.Q.Int64()))))
-	M := k * (par.M + 1)
+	M := k * (par.M + 1) // width of the random masking matrix
 
 	// Sample random masking matrix S (n x M)
 	S := matrix.SampleMatrix(par.N, M, par.Q)
@@ -218,35 +239,36 @@ func Enc(pk PublicKey, mu *big.Int) matrix.BigIntMatrix {
 	return C
 }
 
+// Performs anamorphic encryption with a trapdoor-aware public key.
 func AEnc(apk PublicKey, dk []int, mu, muHat *big.Int) matrix.BigIntMatrix {
 	par := apk.Par
 
+	// Compute gadget dimensions k and M
 	logQ := math.Log2(float64(par.Q.Int64()))
 	k := int(math.Ceil(logQ))
 	M := k * (par.M + 1)
 
-	// S = error matrix (n x M), E = error matrix ((m + 1), M)
-	// stddevAlpha := par.alpha * float64(par.q.Int64())
-	S := matrix.SampleError(par.N, M, 0.5, par.Q)
-	E := matrix.SampleError(par.M+1, M, par.Sigma, par.Q)
+	// Sample random matrices for masking and noise
+	S := matrix.SampleError(par.N, M, 0.5, par.Q)         // masking matrix
+	E := matrix.SampleError(par.M+1, M, par.Sigma, par.Q) // small error matrix
 
-	// Build diagonal matrix J with muHat at indices in dk, else mu
+	// Construct diagonal matrix J with muHat at trapdoor indices
 	J := make(matrix.BigIntMatrix, par.M+1)
 	for i := 0; i < par.M+1; i++ {
 		J[i] = make([]*big.Int, par.M+1)
 		for j := 0; j < par.M+1; j++ {
 			J[i][j] = big.NewInt(0)
-			if i == j {
+			if i == j { // only diagonal entries
 				found := false
 				for _, idx := range dk {
 					if idx == j {
-						J[i][j] = new(big.Int).Set(muHat)
+						J[i][j] = new(big.Int).Set(muHat) // use covert plaintext at trapdoor
 						found = true
 						break
 					}
 				}
 				if !found {
-					J[i][j] = new(big.Int).Set(mu)
+					J[i][j] = new(big.Int).Set(mu) // standard plaintext elsewhere
 				}
 			}
 		}
@@ -263,7 +285,7 @@ func AEnc(apk PublicKey, dk []int, mu, muHat *big.Int) matrix.BigIntMatrix {
 	for i := 0; i < par.M+1; i++ {
 		Jg[i] = make([]*big.Int, M)
 		for col := 0; col < M; col++ {
-			Jg[i][col] = big.NewInt(0) // <- no nils
+			Jg[i][col] = big.NewInt(0) // initialize all entries
 		}
 		for j := 0; j < par.M+1; j++ {
 			if J[i][j].Cmp(big.NewInt(0)) != 0 {
@@ -276,8 +298,6 @@ func AEnc(apk PublicKey, dk []int, mu, muHat *big.Int) matrix.BigIntMatrix {
 		}
 	}
 
-	// fmt.Println("Size of B:", len(apk.B), "x", len(apk.B[0]))
-	// fmt.Println("Size of S:", len(S), "x", len(S[0]))
 	// C = (B*S + Jg + E) mod q
 	BS := matrix.MultiplyMatricesParallel(apk.B, S, par.Q)
 	tmp := matrix.AddMatrices(BS, Jg, par.Q)
@@ -286,19 +306,20 @@ func AEnc(apk PublicKey, dk []int, mu, muHat *big.Int) matrix.BigIntMatrix {
 	return C
 }
 
+// Decrypts a ciphertext matrix using the secret key sk.
 func Dec(par Parameters, sk matrix.BigIntMatrix, ct matrix.BigIntMatrix) *big.Int {
 
-	// delta = round(q/p)
+	// Compute scaling factor delta = round(q / p)
 	delta := new(big.Int).Div(par.Q, par.P)
 
-	// Construct embedding vector em of size (m+1) x 1 with last entry = 1
+	// Construct embedding vector em = [0,...,0,1]^T
 	em := make(matrix.BigIntMatrix, par.M+1)
 	for i := 0; i < par.M; i++ {
 		em[i] = []*big.Int{big.NewInt(0)}
 	}
 	em[par.M] = []*big.Int{big.NewInt(1)}
 
-	// em_delta = delta * em
+	// Multiply by delta for scaling: emDelta = delta * em
 	emDelta := matrix.MultiplyMatrixByConstant(em, delta, par.Q)
 
 	// Construct sk_neg = [-sk^T | 1]
@@ -307,10 +328,10 @@ func Dec(par Parameters, sk matrix.BigIntMatrix, ct matrix.BigIntMatrix) *big.In
 	for i := range sk_T {
 		sk_neg[i] = make([]*big.Int, len(sk_T[i])+1)
 		for j := range sk_T[i] {
-			tmp := new(big.Int).Neg(sk_T[i][j])
-			sk_neg[i][j] = tmp.Mod(tmp, par.Q)
+			tmp := new(big.Int).Neg(sk_T[i][j]) // negate secret
+			sk_neg[i][j] = tmp.Mod(tmp, par.Q)  // modulo q
 		}
-		sk_neg[i][len(sk_T[i])] = big.NewInt(1)
+		sk_neg[i][len(sk_T[i])] = big.NewInt(1) // append 1
 	}
 
 	// Compute Cs = sk_neg * ct mod q
@@ -318,9 +339,6 @@ func Dec(par Parameters, sk matrix.BigIntMatrix, ct matrix.BigIntMatrix) *big.In
 
 	// Gadget decomposition of em_delta
 	G_neg := matrix.GadgetInverse(flattenMatrix(emDelta), par.Q, 2)
-
-	// fmt.Println("Cs:", len(Cs), "x", len(Cs[0]))
-	// fmt.Println("G_neg:", len(G_neg), "x", len(G_neg[0]))
 
 	// nu = Cs * G_neg mod q
 	nu := matrix.MultiplyMatricesParallel(Cs, G_neg, par.Q)
@@ -333,26 +351,27 @@ func Dec(par Parameters, sk matrix.BigIntMatrix, ct matrix.BigIntMatrix) *big.In
 	return mu
 }
 
+// Performs trapdoor-assisted decryption using anamorphic decryption.
 func ADec(par Parameters, dk []int, tk, ask, act matrix.BigIntMatrix) *big.Int {
-	// Compute delta = round(q/p)
+	// Compute scaling factor delta = round(q / p)
 	delta := new(big.Int).Div(par.Q, par.P)
 
-	// Construct e_hat vector ((m+1) x 1)
+	// Construct embedding vector eHat ((m+1) x 1)
+	// Only the last trapdoor index is set to 1
 	eHat := make(matrix.BigIntMatrix, par.M+1)
 	for i := 0; i < par.M+1; i++ {
 		eHat[i] = make([]*big.Int, 1)
 		eHat[i][0] = big.NewInt(0)
 	}
-	// Set embedding unit vector
 	eHat[dk[len(dk)-1]][0] = big.NewInt(1)
 
-	// delta * e_hat
+	// Scale by delta: deltae = delta * eHat
 	deltae := matrix.MultiplyMatrixByConstant(eHat, delta, par.Q)
 
-	// Gadget inverse
+	// Gadget inverse for deltae
 	G_inv := matrix.GadgetInverse(flattenMatrix(deltae), par.Q, 2)
 
-	// Concatenate tk row with 0 to form t_row
+	// Construct tRow = [tk^T | 0] (1 x (m+1))
 	tRow := make(matrix.BigIntMatrix, 1)
 	tRow[0] = make([]*big.Int, par.M+1)
 	for i := 0; i < par.M; i++ {
@@ -360,13 +379,13 @@ func ADec(par Parameters, dk []int, tk, ask, act matrix.BigIntMatrix) *big.Int {
 	}
 	tRow[0][par.M] = big.NewInt(0)
 
-	// Multiply t_row * act mod q
+	// Multiply tRow by ciphertext matrix act mod q
 	rowC := matrix.MultiplyMatricesParallel(tRow, act, par.Q)
 
-	// Multiply rowC * Ginv mod q
+	// Multiply rowC by gadget inverse to get nu
 	nu := matrix.MultiplyMatricesParallel(rowC, G_inv, par.Q)
 
-	// Convert 1x1 result to scalar
+	// Recover plaintext muHat = round(nu / delta) mod p
 	nu_scalar := nu[0][0]
 	qdiv := matrix.RoundDiv(nu_scalar, delta)
 	mutHat := new(big.Int).Mod(qdiv, par.P)

@@ -13,12 +13,16 @@ const LAMLIMIT = 128
 
 const RUNS = 10
 
+// Benchmarks the cryptographic primitives of the scheme
+// with respect to varying security parameter lambda.
 func TestLambda() {
 
+	// Loop over lam values (powers of 2 up tp LAMLIMIT)
 	for i := 0; i < LAMLIMIT; i++ {
-		lam = 1 << i
-		q := new(big.Int).Exp(big.NewInt(2), big.NewInt(50), nil)
+		lam = 1 << i                                              // Set lam = 2^i
+		q := new(big.Int).Exp(big.NewInt(2), big.NewInt(50), nil) // Fix q = 2^50
 
+		// Maps to store serialized sizes of keys, ciphertexts, and decrypted messages.
 		bytes := map[string][]int{
 			"pk":  {},
 			"sk":  {},
@@ -29,6 +33,7 @@ func TestLambda() {
 			"tk":  {},
 		}
 
+		// Maps to store execution times of operations
 		times := map[string][]float64{
 			"kgen": {},
 			"agen": {},
@@ -38,19 +43,25 @@ func TestLambda() {
 			"adec": {},
 		}
 
+		// Repeat each test runs for averaging
 		for j := 0; j < RUNS; j++ {
 			fmt.Println(j)
+
+			// Standard key generation
 			t0 := time.Now()
 			sk, pk := KGen(q)
 			t1 := time.Since(t0).Seconds()
 			times["kgen"] = append(times["kgen"], t1)
+
+			// Record serailized key sizes
 			pkBytes, _ := json.Marshal(pk)
 			skBytes, _ := json.Marshal(sk)
 			bytes["pk"] = append(bytes["pk"], len(pkBytes))
 			bytes["sk"] = append(bytes["sk"], len(skBytes))
 
+			// Standard encryption
 			par := pk.Params
-			mu := matrix.SampleMatrix(par.N, 1, par.P)
+			mu := matrix.SampleMatrix(par.N, 1, par.P) // random plaintext
 			t0 = time.Now()
 			ct := Enc(pk, mu)
 			t1 = time.Since(t0).Seconds()
@@ -58,6 +69,7 @@ func TestLambda() {
 			ctBytes, _ := json.Marshal(ct)
 			bytes["ct"] = append(bytes["ct"], len(ctBytes))
 
+			// Standard decryption
 			t0 = time.Now()
 			dm := Dec(par, sk, ct)
 			t1 = time.Since(t0).Seconds()
@@ -65,6 +77,7 @@ func TestLambda() {
 			dmBytes, _ := json.Marshal(dm)
 			bytes["dm"] = append(bytes["dm"], len(dmBytes))
 
+			// Anamorphic key generation
 			t0 = time.Now()
 			apk, ask, tk := AGen(q)
 			t1 = time.Since(t0).Seconds()
@@ -76,8 +89,9 @@ func TestLambda() {
 			bytes["ask"] = append(bytes["ask"], len(askBytes))
 			bytes["tk"] = append(bytes["tk"], len(tkBytes))
 
+			// Anamorphic encryption
 			par = apk.Params
-			amu := matrix.SampleMatrix(par.N, 1, par.P)
+			amu := matrix.SampleMatrix(par.N, 1, par.P) // additional random plaintext
 			t0 = time.Now()
 			act := AEnc(apk, mu, amu)
 			t1 = time.Since(t0).Seconds()
@@ -85,6 +99,7 @@ func TestLambda() {
 			actBytes, _ := json.Marshal(act)
 			bytes["act"] = append(bytes["act"], len(actBytes))
 
+			// Anamorphic decryption
 			t0 = time.Now()
 			adm := ADec(apk, tk, ask, act)
 			t1 = time.Since(t0).Seconds()
@@ -93,12 +108,13 @@ func TestLambda() {
 			bytes["adm"] = append(bytes["adm"], len(admBytes))
 		}
 
+		// Print header for current lam
 		fmt.Printf("q = 2^%d = %s\n", i, strconv.Itoa(lam))
 		fmt.Println("Average times (seconds):")
 
-		offset := len(times["kgen"]) - RUNS
+		offset := len(times["kgen"]) - RUNS // last RUNS entries
 
-		// Print average times
+		// Compute and print average times for each operation
 		for key, list := range times {
 			sum := 0.0
 			for j := offset; j < offset+RUNS; j++ {
@@ -108,9 +124,8 @@ func TestLambda() {
 			fmt.Printf("  %-5s : %.6f\n", key, avg)
 		}
 
+		// Compute and print average serialized sizes
 		fmt.Println("Average sizes (bytes):")
-
-		// Print average byte sizes
 		for key, list := range bytes {
 			sum := 0
 			for j := offset; j < offset+RUNS; j++ {
