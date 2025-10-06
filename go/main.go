@@ -1,16 +1,17 @@
 package main
 
 import (
+	dgsw "anamorphicLWE/DualGSW"
 	DR "anamorphicLWE/DualRegev"
 	PR "anamorphicLWE/PrimalRegev"
 	tDR "anamorphicLWE/TrapdoorlessDR"
-	dgsw "anamorphicLWE/dualGSW"
 	"anamorphicLWE/matrix"
 	"crypto/rand"
 	"fmt"
 	"math/big"
 )
 
+// Tests trapdoorless Dual Regev encryption scheme
 func asymDR() {
 	iterations := 100      // number of test runs
 	regularSuccess := 0    // counter for standard encryption/decryption success
@@ -22,20 +23,20 @@ func asymDR() {
 	for i := 0; i < iterations; i++ {
 		fmt.Println("Iteration round:", i+1)
 
-		// 1. Generate secret key (sk) and public key (pk)
+		// Generate secret key (sk) and public key (pk)
 		sk, pk := tDR.KGen()
 		par := pk.Par
 
-		// 2. Sample plaintext mu in Z_p
+		// Sample plaintext mu in Z_p
 		mu := matrix.SampleMatrix(1, 1, par.P)
 
-		// 3. Encrypt mu
+		// Encrypt mu
 		ct := tDR.Enc(pk, mu)
 
-		// 4. Decrypt ciphertext
+		// Decrypt ciphertext
 		dm := tDR.Dec(par, sk, ct)
 
-		// 5. Compare decrypted result with original
+		// Compare decrypted result with original
 		if mu[0][0].String() == dm.String() {
 			regularSuccess++
 		} else {
@@ -50,20 +51,20 @@ func asymDR() {
 	for i := 0; i < iterations; i++ {
 		fmt.Println("Iteration round:", i+1)
 
-		// 1. Generate anamorphic key material
+		// Generate anamorphic key material
 		_, apk, dk, tk := tDR.AGen()
 
-		// 2. Sample original message mu and anamorphic message mu_hat
+		// Sample original message mu and anamorphic message mu_hat
 		mu := matrix.SampleMatrix(1, 1, apk.Par.P)
 		mu_hat := matrix.SampleMatrix(dk.K, 1, apk.Par.P)
 
-		// 3. Anamorphic encryption
+		// Anamorphic encryption
 		act := tDR.AEnc(apk, dk, mu[0][0], mu_hat)
 
-		// 4. Anamorphic decryption
+		// Anamorphic decryption
 		adm := tDR.ADec(apk.Par, dk, tk, act)
 
-		// 5. Compare decrypted mu_hat with original mu_hat
+		// Compare decrypted mu_hat with original mu_hat
 		if matrix.CompareMatrices(mu_hat, adm) {
 			anamorphicSuccess++
 		} else {
@@ -104,7 +105,7 @@ func gsw() {
 	for i := 0; i < iterations; i++ {
 		fmt.Println("Iteration number:", i+1)
 
-		// 1. Regular message encryption/decryption
+		// Regular message encryption/decryption
 		mu, _ := rand.Int(rand.Reader, pk.Par.P) // Sample random plaintext mu ∈ Zp
 		ct := dgsw.Enc(pk, mu)                   // Encrypt using standard scheme
 		dm := dgsw.Dec(pk.Par, sk, ct)           // Decrypt ciphertext
@@ -116,7 +117,7 @@ func gsw() {
 			fmt.Println("Regular message: ", mu, "and decrypted one: ", dm)
 		}
 
-		// 2. Anamorphic message encryption/decryption
+		// Anamorphic message encryption/decryption
 		muHat, _ := rand.Int(rand.Reader, apk.Par.P) // Sample random plaintext for anamorphic encryption
 
 		act := dgsw.AEnc(apk, aks.Dk, mu, muHat)                // Encrypt message using anamorphic scheme
@@ -138,11 +139,16 @@ func gsw() {
 
 func dualregev() {
 	q := new(big.Int).Exp(big.NewInt(2), big.NewInt(128), nil)
+
+	// Generate key pair
 	sk, pk := DR.KGen(q)
 	par := pk.Params
+
+	// Sample original message
 	mu := matrix.SampleMatrix(par.N, 1, par.P)
 	fmt.Printf("Original message: %v\n", matrix.Transpose(mu))
 
+	// Regular encrytption/decryption
 	ct := DR.Enc(pk, mu)
 	dm := DR.Dec(par, sk, ct)
 	fmt.Printf("Decrypted message: %v\n", matrix.Transpose(dm))
@@ -153,40 +159,40 @@ func dualregev() {
 		fmt.Println("LWE decryptions fails! ❌")
 	}
 
+	// Anamorphic key generation
 	apk, ask, tk := DR.AGen(q)
 	par = apk.Params
+
+	// Sample messages
 	mu = matrix.SampleMatrix(par.N, 1, par.P)
 	amu := matrix.SampleMatrix(par.N, 1, par.P)
-
 	fmt.Printf("Regular message: %v\n", matrix.Transpose(mu))
 	fmt.Printf("Anamorphic message: %v\n", matrix.Transpose(amu))
 
+	// Regular encryption/decryption with anamorphic key pair
 	ct = DR.Enc(apk, mu)
 	dm = DR.Dec(par, ask, ct)
-
 	fmt.Printf("Original message: %v\n", matrix.Transpose(mu))
 	fmt.Printf("Decrypted message: %v\n", matrix.Transpose(mu))
-
 	if matrix.CompareMatrices(mu, dm) {
 		fmt.Println("Dual Regev works with anamorphic key pair! ✅")
 	} else {
 		fmt.Println("Dual Regev fails with anamorphic key pair! ❌")
 	}
 
+	// Anamorphic encryption/decryption
 	act := DR.AEnc(apk, mu, amu)
 	adm := DR.ADec(apk, tk, ask, act)
-
 	fmt.Printf("Original anamorphic message: %v\n", matrix.Transpose(amu))
 	fmt.Printf("Decrypted anamorphic message: %v\n", matrix.Transpose(adm))
-
 	if matrix.CompareMatrices(amu, adm) {
 		fmt.Println("Anamorphic Dual Regev decryption works! ✅")
 	} else {
 		fmt.Println("Anamorphic Dual Regev decryption fails! ❌")
 	}
 
+	// Test if regular decryption works on anamorphic ciphertext
 	dm = DR.Dec(par, ask, act)
-
 	fmt.Printf("Original message in anamorphic ciphertext: %v\n", matrix.Transpose(mu))
 	fmt.Printf("Decrypted original message from anamorphic ciphertext: %v\n", matrix.Transpose(dm))
 
@@ -197,56 +203,61 @@ func dualregev() {
 	}
 }
 
+// Tests anamorphic Primal Regev scheme
 func primalregev() {
-	q := new(big.Int).Exp(big.NewInt(2), big.NewInt(16), nil)
+	q := new(big.Int).Exp(big.NewInt(2), big.NewInt(16), nil) // set modulus q = 2^16
+
+	// Generate primal key pair
 	pk, sk := PR.KGen(q)
 	par := pk.Params
-	mu := matrix.SampleMatrix(par.L, 1, par.P)
 
+	// Sample message
+	mu := matrix.SampleMatrix(par.L, 1, par.P)
 	fmt.Println("Original message:", matrix.Transpose(mu))
 
+	// Regular encryption/decryption
 	ct := PR.Enc(pk, mu)
 	dm := PR.Dec(par, sk, ct)
-
 	fmt.Println("Decrypted message:", matrix.Transpose(dm))
-
 	if matrix.CompareMatrices(mu, dm) {
 		fmt.Println("LWE decryption works! ✅")
 	} else {
 		fmt.Println("LWE decryption fails! ❌")
 	}
 
+	// Sample anamorphic message
 	amu := matrix.SampleMatrix(par.L, 1, par.P)
+
+	// Generate anamorphic key pair
 	apk, ask, dk, tk := PR.AGen(q)
 	par = apk.Params
+
+	// Encryption/decryption using anamorphic key
 	ct = PR.Enc(apk, mu)
 	dm = PR.Dec(par, ask, ct)
 	fmt.Println("Original Message: ", matrix.Transpose(mu))
 	fmt.Println("Decrypted message: ", matrix.Transpose(dm))
-
 	if matrix.CompareMatrices(mu, dm) {
 		fmt.Println("LWE decryption works with anamorphic key pair! ✅")
 	} else {
 		fmt.Println("LWE decryption fails with anamorphic key pair! ❌")
 	}
 
+	// Anamorphic encryption/decryption
 	act := PR.AEnc(apk, dk, mu, amu)
 	adm := PR.ADec(tk, act, apk)
-
 	fmt.Println("Original anamorphic message: ", matrix.Transpose(amu))
 	fmt.Println("Decrypted anamorphic message: ", matrix.Transpose(adm))
-
 	if matrix.CompareMatrices(amu, adm) {
 		fmt.Println("Anamorphic decryption works! ✅")
 	} else {
 		fmt.Println("Anamorphic decryption fails! ❌")
 	}
 
+	// Regular decryption on anamorphic ciphertext
 	dm = PR.Dec(par, ask, act)
-
 	fmt.Println("Original message: ", matrix.Transpose(mu))
 	fmt.Println("Original message decrypted from anamorphic ciphertext: ", matrix.Transpose(dm))
-
 	if matrix.CompareMatrices(mu, dm) {
 		fmt.Println("Regular decryption works with anamorphic ciphertext! ✅")
 	} else {
@@ -255,5 +266,11 @@ func primalregev() {
 }
 
 func main() {
-	primalregev()
+	primalregev() // Run Primal Regev functionality tests
+	dualregev()   // Run Dual Regev functionality tests
+	asymDR()      // Run trapdoorless Dual Regev functionality tests
+	gsw()         // Run Dual GSW functionality tests
+	// DR.TestLambda()	// Test different lambda values for Dual Regev
+	// DR.RunTests()	// Test different ciphertext modulus values for Dual Regev
+	// PR.RunTests()	// Test different ciphertext modulus values for Primal Regev
 }
