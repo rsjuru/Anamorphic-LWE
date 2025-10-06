@@ -7,7 +7,7 @@ This folder contains Go implementations of the anamorphic primal and dual Regev 
 
 ## Notes
 
-1. This library contains implementations for four different anamorphic LWE scheme:
+1. This library contains Go implementations for four different anamorphic LWE scheme:
     - Public-Key Anamorphic Dual Regev
     - Fully Asymmetric AE from Primal Regev
     - Fully Asymmetric Anamorphic FHE from Dual GSW
