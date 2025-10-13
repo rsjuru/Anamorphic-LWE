@@ -6,8 +6,6 @@ import (
 	"math/big"
 )
 
-var lam = 2
-
 type ParameterSet struct {
 	Q      *big.Int
 	P      *big.Int
@@ -24,13 +22,10 @@ type PublicKey struct {
 }
 
 // Generates cryptographic parameters for Dual Regev scheme.
-func gen_parameters(qOpt ...*big.Int) ParameterSet {
+func gen_parameters(lam int) ParameterSet {
 
 	// Set modulus q
 	q := new(big.Int).SetUint64(1 << 15)
-	if len(qOpt) > 0 {
-		q = qOpt[0]
-	}
 
 	// Set plaintext modulus p
 	p := new(big.Int).SetUint64(5)
@@ -64,24 +59,24 @@ func gen_parameters(qOpt ...*big.Int) ParameterSet {
 }
 
 // Generates a key pair for the lattice-based scheme.
-func KGen(q *big.Int) (matrix.BigIntMatrix, PublicKey) {
+func KGen(lam int) (matrix.BigIntMatrix, PublicKey) {
 	// Generate cryptographic parameters
-	par := gen_parameters(q)
+	par := gen_parameters(lam)
 
 	// Gadget matrix dimension k = ceil(log2(q))
-	k := matrix.Log2BigInt(q)
+	k := matrix.Log2BigInt(par.Q)
 
 	// Compute matrix width m for A(n x m)
 	m := par.MBar + par.N*k
 
 	// Sample public matrix A (uniform in Zq)
-	A := matrix.SampleMatrix(par.N, m, q)
+	A := matrix.SampleMatrix(par.N, m, par.Q)
 
 	// Sample secret key matrix E (small error)
-	E := matrix.SampleError(m, par.N, par.StdDev, q)
+	E := matrix.SampleError(m, par.N, par.StdDev, par.Q)
 
 	// Compute U = A*E mod q
-	U := matrix.MultiplyMatricesParallel(A, E, q)
+	U := matrix.MultiplyMatricesParallel(A, E, par.Q)
 
 	// Return secret key and public key
 	return E, PublicKey{
@@ -174,33 +169,33 @@ func Dec(par ParameterSet, sk matrix.BigIntMatrix, ct [2]matrix.BigIntMatrix) ma
 }
 
 // Generates a public key with a trapdoor for anamorphic dual Regev scheme.
-func AGen(q *big.Int) (apk PublicKey, ask matrix.BigIntMatrix, tk matrix.BigIntMatrix) {
+func AGen(lam int) (apk PublicKey, ask matrix.BigIntMatrix, tk matrix.BigIntMatrix) {
 	// Generate parameters (same as kgen)
-	par := gen_parameters(q)
-	k := matrix.Log2BigInt(q)
+	par := gen_parameters(lam)
+	k := matrix.Log2BigInt(par.Q)
 	m := par.MBar + par.N*k
 
 	// Generate trapdoor matrix R ∈ {−1, 0, 1}
-	R := matrix.SampleError(par.MBar, par.N*k, par.StdDev, q)
+	R := matrix.SampleError(par.MBar, par.N*k, par.StdDev, par.Q)
 
 	// Sample A_bar (n x mbar), a uniform public matrix
-	A_bar := matrix.SampleMatrix(par.N, par.MBar, q)
+	A_bar := matrix.SampleMatrix(par.N, par.MBar, par.Q)
 
 	// Construct a gadget matrix (n x n*k)
-	G := matrix.GadgetMatrixParallel(par.N, k, q)
+	G := matrix.GadgetMatrixParallel(par.N, k, par.Q)
 
 	// right side of A = A_bar*R + G
-	AR := matrix.MultiplyMatricesParallel(A_bar, R, q)
-	right := matrix.AddMatrices(AR, G, q)
+	AR := matrix.MultiplyMatricesParallel(A_bar, R, par.Q)
+	right := matrix.AddMatrices(AR, G, par.Q)
 
 	// Concatenate A_bar and right side to form full A
-	A := matrix.HorzConcat(A_bar, right, q)
+	A := matrix.HorzConcat(A_bar, right, par.Q)
 
 	// Sample secret error matrix E (m x n)
-	E := matrix.SampleError(m, par.N, par.StdDev, q)
+	E := matrix.SampleError(m, par.N, par.StdDev, par.Q)
 
 	// Compute U = A * E mod q
-	U := matrix.MultiplyMatricesParallel(A, E, q)
+	U := matrix.MultiplyMatricesParallel(A, E, par.Q)
 
 	// Return public key, secret key and trapdoor.
 	return PublicKey{

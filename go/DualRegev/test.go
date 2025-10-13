@@ -44,7 +44,7 @@ func RunTests() {
 		for j := 0; j < RUNS; j++ {
 			// ------------------ Key Generation ------------------
 			t0 := time.Now()
-			sk, pk := KGen(q) // regular keygen
+			sk, pk := KGen(64) // regular keygen
 			t1 := time.Since(t0).Seconds()
 			times["kgen"] = append(times["kgen"], t1)
 
@@ -76,7 +76,7 @@ func RunTests() {
 
 			// ------------------ Anamorphic Key Generation ------------------
 			t0 = time.Now()
-			apk, ask, tk := AGen(q)
+			apk, ask, tk := AGen(64)
 			t1 = time.Since(t0).Seconds()
 			times["agen"] = append(times["agen"], t1)
 

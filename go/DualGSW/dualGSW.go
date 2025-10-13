@@ -31,7 +31,6 @@ type AKeySet struct {
 	Tk  matrix.BigIntMatrix
 }
 
-const lambda = 2
 const L = 3
 
 // Extracts the first column of a matrix and returns it as a vector
@@ -51,26 +50,27 @@ func flattenMatrix(mat matrix.BigIntMatrix) []*big.Int {
 
 // Generates the cryptographic parameters for a scheme
 // based on a modulus q.
-func genParameters(q *big.Int) Parameters {
+func genParameters(lam int) Parameters {
 	// Seed the math/rand pseudo-random generator
 	mrand.Seed(time.Now().UnixNano())
 
 	// Define key dimensions and plaintext modulus
-	n := lambda * 2
+	n := lam
 	p := big.NewInt(256) // plaintext modulus
+	q := new(big.Int).Lsh(big.NewInt(1), 18)
 	k := int(math.Ceil(math.Log2(float64(q.Int64()))))
-	m := 10 * n
+	m := 5 * n
 
 	// Randomize n0 within safe bounds
-	upperLimit := int(math.Floor(float64(m)/2.0 - math.Ceil(math.Sqrt(float64(lambda*m)/2.0))))
+	upperLimit := int(math.Floor(float64(m)/2.0 - math.Ceil(math.Sqrt(float64(lam*m)/2.0))))
 	if upperLimit < 2 {
 		upperLimit = 2
 	}
 	n0 := mrand.Intn(upperLimit-1) + 2
 
 	// Ensure that m is sufficiently large for the system to be solvable
-	if m-n0 <= n*k+2*lambda {
-		m = n*k + 2*lambda + n0 + 1
+	if m-n0 <= n*k+2*lam {
+		m = n*k + 2*lam + n0 + 1
 	}
 
 	// Define noise parameters
@@ -91,9 +91,9 @@ func genParameters(q *big.Int) Parameters {
 
 // Generates a secret key and a correspoinding public key
 // for a lattice-based scheme.
-func KGen(q *big.Int) (sk matrix.BigIntMatrix, pk PublicKey) {
+func KGen(lam int) (sk matrix.BigIntMatrix, pk PublicKey) {
 	// Generate cryptographic parameters
-	par := genParameters(q)
+	par := genParameters(lam)
 
 	// Sample uniform matrix A (n x m)
 	A := matrix.SampleMatrix(par.N, par.M, par.Q)
@@ -104,7 +104,7 @@ func KGen(q *big.Int) (sk matrix.BigIntMatrix, pk PublicKey) {
 	// Compute s^T * A^T mod q
 	A_T := matrix.Transpose(A)
 	s_T := matrix.Transpose(s)
-	As := matrix.MultiplyMatricesParallel(s_T, A_T, q)
+	As := matrix.MultiplyMatricesParallel(s_T, A_T, par.Q)
 
 	// Public key: vertically stack A^T and As
 	rowsA := len(A_T)
@@ -134,9 +134,9 @@ func KGen(q *big.Int) (sk matrix.BigIntMatrix, pk PublicKey) {
 }
 
 // Generates key set for anamorphic dual GSW scheme.
-func AGen(q *big.Int) *AKeySet {
+func AGen(lam int) *AKeySet {
 	// Generate cryptographic parameters and secret vector s
-	par := genParameters(q)
+	par := genParameters(lam)
 	s := matrix.SampleMatrixP(par.M, 1)
 
 	// Identify zero positions in s (needed for trapdoor construction)

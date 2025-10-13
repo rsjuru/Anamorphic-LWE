@@ -4,7 +4,6 @@ import (
 	"anamorphicLWE/matrix"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"strconv"
 	"time"
 )
@@ -19,8 +18,8 @@ func TestLambda() {
 
 	// Loop over lam values (powers of 2 up tp LAMLIMIT)
 	for i := 0; i < LAMLIMIT; i++ {
-		lam = 1 << i                                              // Set lam = 2^i
-		q := new(big.Int).Exp(big.NewInt(2), big.NewInt(50), nil) // Fix q = 2^50
+		lam := 1 << i // Set lam = 2^i
+		// q := new(big.Int).Exp(big.NewInt(2), big.NewInt(50), nil) // Fix q = 2^50
 
 		// Maps to store serialized sizes of keys, ciphertexts, and decrypted messages.
 		bytes := map[string][]int{
@@ -49,7 +48,7 @@ func TestLambda() {
 
 			// Standard key generation
 			t0 := time.Now()
-			sk, pk := KGen(q)
+			sk, pk := KGen(lam)
 			t1 := time.Since(t0).Seconds()
 			times["kgen"] = append(times["kgen"], t1)
 
@@ -79,7 +78,7 @@ func TestLambda() {
 
 			// Anamorphic key generation
 			t0 = time.Now()
-			apk, ask, tk := AGen(q)
+			apk, ask, tk := AGen(lam)
 			t1 = time.Since(t0).Seconds()
 			times["agen"] = append(times["agen"], t1)
 			apkBytes, _ := json.Marshal(apk)

@@ -19,7 +19,7 @@ func RunTests() {
 	fmt.Printf("%-10s %-10s %-10s %-10s %-10s %-10s\n", "i", "q=2^i", "avg_kgen", "avg_pkB", "avg_skB", "avg_enc")
 
 	// Loop over q = 2^i, for i = 0..QLIMIT
-	for i := 0; i < QLIMIT; i++ {
+	for i := 1; i < QLIMIT; i++ {
 		i64 := int64(i)
 		q := new(big.Int).Exp(big.NewInt(2), big.NewInt(i64), nil) // q = 2^i
 
@@ -51,7 +51,7 @@ func RunTests() {
 		for j := 0; j < RUNS; j++ {
 			// Standard key generation
 			t0 := time.Now()
-			pk, sk := KGen(q)
+			pk, sk := KGen(64)
 			t1 := time.Since(t0).Seconds()
 			times["kgen"] = append(times["kgen"], t1)
 
@@ -81,7 +81,7 @@ func RunTests() {
 
 			// Anamorphic key generation
 			t0 = time.Now()
-			apk, ask, dk, tk := AGen(q)
+			apk, ask, dk, tk := AGen(64)
 			t1 = time.Since(t0).Seconds()
 			times["agen"] = append(times["agen"], t1)
 			apkBytes, _ := json.Marshal(apk)
@@ -105,7 +105,7 @@ func RunTests() {
 
 			// Anamorphic decryption
 			t0 = time.Now()
-			adm := ADec(tk, act, apk)
+			adm := ADec(64, tk, act, apk)
 			t1 = time.Since(t0).Seconds()
 			times["adec"] = append(times["adec"], t1)
 			admBytes, _ := json.Marshal(adm)

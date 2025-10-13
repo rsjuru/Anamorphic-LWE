@@ -5,9 +5,6 @@ import (
 	"math/big"
 )
 
-// Security parameter
-const lam = 2
-
 // Structure for cryptographic parameters
 type ParameterSet struct {
 	Q     *big.Int
@@ -26,14 +23,9 @@ type PublicKey struct {
 }
 
 // Generates a set of cryptographic parameters for primal Regev scheme.
-func genParameters(qOpt ...*big.Int) ParameterSet {
+func genParameters(lam int) ParameterSet {
 	// Set default q to 2^15 as a big.Int
 	q := new(big.Int).SetUint64(1 << 15)
-
-	// If a custom q is provided in qOpt, override the default
-	if len(qOpt) > 0 {
-		q = qOpt[0]
-	}
 
 	// Set plaintext modulus p
 	p := big.NewInt(5)
@@ -42,7 +34,7 @@ func genParameters(qOpt ...*big.Int) ParameterSet {
 	k := matrix.Log2BigInt(q)
 
 	// Define dimensions l, n and m
-	l := 4 * lam
+	l := lam
 	n := 2*l*k + 2*lam
 	m := (n+l)*k + 2*lam
 
@@ -51,9 +43,9 @@ func genParameters(qOpt ...*big.Int) ParameterSet {
 }
 
 // Generates a public/private key pair for primal Regev cryptosystem.
-func KGen(q *big.Int) (PublicKey, matrix.BigIntMatrix) {
+func KGen(lam int) (PublicKey, matrix.BigIntMatrix) {
 	// Generate cryptographic parameters
-	par := genParameters(q)
+	par := genParameters(lam)
 
 	// Sample a random matrix A (n x m) with entries mod q
 	A := matrix.SampleMatrix(par.N, par.M, par.Q)
@@ -149,9 +141,9 @@ func Dec(par ParameterSet, sk matrix.BigIntMatrix, ct [2]matrix.BigIntMatrix) ma
 }
 
 // Generates an advanced set of matrices for an anamorphic primal Regev.
-func AGen(q *big.Int) (PublicKey, matrix.BigIntMatrix, [2]matrix.BigIntMatrix, matrix.BigIntMatrix) {
+func AGen(lam int) (PublicKey, matrix.BigIntMatrix, [2]matrix.BigIntMatrix, matrix.BigIntMatrix) {
 	// Generate cryptoraphic parameters
-	par := genParameters(q)
+	par := genParameters(lam)
 
 	// Compute k = log2(q)
 	k := matrix.Log2BigInt(par.Q)
@@ -250,7 +242,7 @@ func AEnc(apk PublicKey, dk [2]matrix.BigIntMatrix, mu, smu matrix.BigIntMatrix)
 }
 
 // Performs anamorphic decryption of a ciphertext using the trapdoor tk.
-func ADec(tk matrix.BigIntMatrix, act [2]matrix.BigIntMatrix, apk PublicKey) matrix.BigIntMatrix {
+func ADec(lam int, tk matrix.BigIntMatrix, act [2]matrix.BigIntMatrix, apk PublicKey) matrix.BigIntMatrix {
 	// Extract the first component of the ciphertext
 	c0 := act[0]
 
