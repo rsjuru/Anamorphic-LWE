@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Strcuture for cryptographic parameters
 type Parameters struct {
 	Q     *big.Int
 	P     *big.Int
@@ -18,16 +19,19 @@ type Parameters struct {
 	Sigma float64
 }
 
+// Structure for public key
 type PublicKey struct {
 	Par Parameters
 	B   matrix.BigIntMatrix
 }
 
+// Structure for double key
 type DoubleKey struct {
 	K int
 	I []int
 }
 
+// Security parameter
 const Lambda = 32
 
 // Returns k x k identity matrix mod q
@@ -117,34 +121,34 @@ func GenParameters() Parameters {
 
 // Generates a secret key and corresponding public key for the LWE scheme.
 func KGen() (matrix.BigIntMatrix, PublicKey) {
-	// 1. Generate scheme parameters
+	// Generate scheme parameters
 	par := GenParameters()
 
-	// 2. Sample a uniform random matrix A if size n x m with entries in Z_q
+	// Sample a uniform random matrix A if size n x m with entries in Z_q
 	A := matrix.SampleMatrix(par.N, par.M, par.Q)
 
-	// 3. Sample secret key s from P^m (entries {-1, 0, 1}) as an m x 1 matrix
+	// Sample secret key s from P^m (entries {-1, 0, 1}) as an m x 1 matrix
 	s := matrix.SampleMatrixP(par.M, 1)
 
-	// 4. Compute s^T * A^T mod q
+	// Compute s^T * A^T mod q
 	AT := matrix.Transpose(A)
 	sT := matrix.Transpose(s)
 	As := matrix.MultiplyMatricesParallel(sT, AT, par.Q)
 
-	// 5. Construct public key matrix B by vertically stacking A^T and As
+	// Construct public key matrix B by vertically stacking A^T and As
 	B := matrix.AppendRows(AT, As)
 
-	// 6. Return secret key and public key struct
+	// Return secret key and public key struct
 	pk := PublicKey{Par: par, B: B}
 	return s, pk
 }
 
 // Generates an anamorphic LWE keypair with asymmetric anamorphic keypair (dk, tk)
 func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
-	// 1. Generate base LWE parameters
+	// Generate base LWE parameters
 	par := GenParameters()
 
-	// 2. Compute heuristic k based on m and lambda
+	// Compute heuristic k based on m and lambda
 	kFloat := math.Ceil(float64(par.M)/2.0 - math.Ceil(math.Sqrt(float64(Lambda*par.M)/2.0)))
 	k := int(kFloat)
 
@@ -155,7 +159,7 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		k = int(math.Ceil(float64(k) / 2.0))
 	}
 
-	// 3. Sample secret s and determine zero entries J
+	// Sample secret s and determine zero entries J
 	s := matrix.SampleMatrixP(par.M, 1)
 	J := make([]int, 0)
 	for i := 0; i < par.M; i++ {
@@ -164,7 +168,7 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		}
 	}
 
-	// Retru if number of zeros < k
+	// Retry if number of zeros < k
 	maxTries := 10
 	tries := 0
 	for len(J) < k && tries < maxTries {
@@ -181,7 +185,7 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		return nil, PublicKey{}, DoubleKey{}, nil
 	}
 
-	// 4. Choose I ⊆ J uniformly at random, then sort for reproducibility
+	// Choose I ⊆ J uniformly at random, then sort for reproducibility
 	mrand.Shuffle(len(J), func(a, b int) { J[a], J[b] = J[b], J[a] })
 	I := make([]int, k)
 	copy(I, J[:k])
@@ -197,14 +201,14 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		I[b+1] = key
 	}
 
-	// 5. Sample matrices for tk construction
+	// Sample matrices for tk construction
 	A_bar := matrix.SampleMatrix(par.M-k, par.N, par.Q)          // uniform ((m-k) x n)
 	T := matrix.SampleMatrixP(par.M-k, k)                        // from P ((m-k) x k)
 	TT := matrix.Transpose(T)                                    // k x (m-k)
 	TT_Abar := matrix.MultiplyMatricesParallel(TT, A_bar, par.Q) // k x n
 	A_prime := matrix.AppendRows(A_bar, TT_Abar)                 // stack(m x n)
 
-	// 6. Permute rows of A_prime according to I and its complement
+	// Permute rows of A_prime according to I and its complement
 	fullIdx := make([]int, par.M)
 	for i := 0; i < par.M; i++ {
 		fullIdx[i] = i
@@ -223,7 +227,7 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		return nil, PublicKey{}, DoubleKey{}, nil
 	}
 
-	// 7. Initialize A (m x n) and place rows from A_prime
+	// Initialize A (m x n) and place rows from A_prime
 	A := make(matrix.BigIntMatrix, par.M)
 	for i := 0; i < par.M; i++ {
 		A[i] = make([]*big.Int, par.N)
@@ -248,21 +252,21 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		}
 	}
 
-	// 8. Compute As = s^T * A (1 x n)
+	// Compute As = s^T * A (1 x n)
 	sT := matrix.Transpose(s) //
 	As := matrix.MultiplyMatricesParallel(sT, A, par.Q)
 
-	// 9. Build public key B = [A; As]
+	// Build public key B = [A; As]
 	B := matrix.AppendRows(A, As)
 	apk := PublicKey{Par: par, B: B}
 	ask := s
 
-	// 10. Build trapdoor matrix T' = [-T^T | I_k] (k x m)
+	// Build trapdoor matrix T' = [-T^T | I_k] (k x m)
 	negTT := NegateMatrix(TT, par.Q)              // k x (m-k)
 	Ik := IdentityMatrix(k, par.Q)                // k x k
 	Tprime := matrix.HorzConcat(negTT, Ik, par.Q) // k x m
 
-	// 11. Reorder columns of Tprime to form eT
+	// Reorder columns of Tprime to form eT
 	eT := make(matrix.BigIntMatrix, k)
 	for i := 0; i < k; i++ {
 		eT[i] = make([]*big.Int, par.M)
@@ -284,7 +288,7 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		}
 	}
 
-	// 12. Sanity checks; ensure Tprime * A_prime == 0 and eT * A == 0 (mod q)
+	// Sanity checks; ensure Tprime * A_prime == 0 and eT * A == 0 (mod q)
 	lhs := matrix.MultiplyMatricesParallel(Tprime, A_prime, par.Q)
 	if !AreAllZeros(lhs, par.Q) {
 		log.Println("Warning: Tprime * A_prime != 0 (mod q)")
@@ -295,7 +299,7 @@ func AGen() (matrix.BigIntMatrix, PublicKey, DoubleKey, matrix.BigIntMatrix) {
 		log.Println("Warning: eT * A != 0 (mod q)")
 	}
 
-	// 13. Pack double key information
+	// Pack double key information
 	dk := DoubleKey{K: k, I: I}
 
 	return ask, apk, dk, eT
@@ -309,20 +313,20 @@ func Enc(pk PublicKey, mu matrix.BigIntMatrix) matrix.BigIntMatrix {
 	// Compute scaling factor delta = floor(q/p)
 	delta := new(big.Int).Div(par.Q, par.P)
 
-	// 1. Sample a random uniform vector r of size n x 1
+	// Sample a random uniform vector r of size n x 1
 	r := matrix.SampleMatrix(par.N, 1, par.Q)
 
-	// 2. Sample small error vectors e0 (m x 1)and e1 (1 x 1)
+	// Sample small error vectors e0 (m x 1)and e1 (1 x 1)
 	e0 := matrix.SampleError(par.M, 1, par.Sigma, par.Q)
 	e1 := matrix.SampleError(1, 1, par.Sigma, par.Q)
 
-	// 3. Compute B*r mod q
+	// Compute B*r mod q
 	Br := matrix.MultiplyMatricesParallel(B, r, par.Q)
 
-	// 4. Stack error vectors vertically: e = [e0; e1]
+	// Stack error vectors vertically: e = [e0; e1]
 	e := matrix.AppendRows(e0, e1)
 
-	// 5. Stack message mu with zeros (to match dimension m+1)
+	// Stack message mu with zeros (to match dimension m+1)
 	zeros := make(matrix.BigIntMatrix, par.M)
 	for i := 0; i < par.M; i++ {
 		zeros[i] = make([]*big.Int, 1) // 1 column
@@ -330,10 +334,10 @@ func Enc(pk PublicKey, mu matrix.BigIntMatrix) matrix.BigIntMatrix {
 	}
 	mu_stack := matrix.AppendRows(zeros, mu) // size (m+1) x 1
 
-	// 6. Scale mu_stack by delta and reduce mod q
+	// Scale mu_stack by delta and reduce mod q
 	delta_mustack := matrix.MultiplyMatrixByConstant(mu_stack, delta, par.Q)
 
-	// 7. Compute ciphertext: c = B*r + e + delta*mu_stack (mod q)
+	// Compute ciphertext: c = B*r + e + delta*mu_stack (mod q)
 	tmp := matrix.AddMatrices(Br, e, par.Q)
 	c := matrix.AddMatrices(tmp, delta_mustack, par.Q)
 
@@ -350,12 +354,12 @@ func AEnc(apk PublicKey, dk DoubleKey, mu *big.Int, muHat matrix.BigIntMatrix) [
 		delta = new(big.Int).Add(delta, big.NewInt(1)) // ceil
 	}
 
-	// 1. Sample randomness r, e0, e1
+	// Sample randomness r, e0, e1
 	r := matrix.SampleMatrix(par.N, 1, par.Q)            // n x 1
 	e0 := matrix.SampleError(par.M, 1, par.Sigma, par.Q) // m x 1
 	e1 := matrix.SampleError(1, 1, par.Sigma, par.Q)     // 1 x 1
 
-	// 2. Construct f vector (m x 1), embedding muHat at indices I
+	// Construct f vector (m x 1), embedding muHat at indices I
 	f := make(matrix.BigIntMatrix, par.M)
 	for i := 0; i < par.M; i++ {
 		f[i] = []*big.Int{big.NewInt(0)}
@@ -364,20 +368,20 @@ func AEnc(apk PublicKey, dk DoubleKey, mu *big.Int, muHat matrix.BigIntMatrix) [
 		f[idx][0] = new(big.Int).Set(muHat[j][0])
 	}
 
-	// 3. Compute Br = B * r mod q
+	// Compute Br = B * r mod q
 	Br := matrix.MultiplyMatricesParallel(B, r, par.Q)
 
-	// 4. Stack e = [e0; e1]
+	// Stack e = [e0; e1]
 	e := matrix.AppendRows(e0, e1)
 
-	// 5. Stack f and mu vertically: f_and_mu = [f; mu]
+	// Stack f and mu vertically: f_and_mu = [f; mu]
 	muCol := matrix.BigIntMatrix{{mu}}
 	fAndMu := matrix.AppendRows(f, muCol)
 
-	// 6. Multiply by delta mod q
+	// Multiply by delta mod q
 	deltaTerm := matrix.MultiplyMatrixByConstant(fAndMu, delta, par.Q)
 
-	// 7. Compute ciphertext: c = Br + e + deltaTerm mod q
+	// Compute ciphertext: c = Br + e + deltaTerm mod q
 	c := matrix.AddMatrices(Br, e, par.Q)
 	c = matrix.AddMatrices(c, deltaTerm, par.Q)
 
@@ -389,7 +393,7 @@ func Dec(par Parameters, sk, ct matrix.BigIntMatrix) *big.Int {
 	// 1. Compute delta = q / p
 	delta := new(big.Int).Div(par.Q, par.P)
 
-	// 2. Construct sk_neg = [-sk^T | 1]
+	// Construct sk_neg = [-sk^T | 1]
 	skT := matrix.Transpose(sk)
 	sk_neg := make(matrix.BigIntMatrix, len(skT)) // will be 1 x (m+1)
 	for i := range skT {
@@ -403,11 +407,11 @@ func Dec(par Parameters, sk, ct matrix.BigIntMatrix) *big.Int {
 		sk_neg[i][len(skT[i])] = big.NewInt(1)
 	}
 
-	// 3. Compute nu = sk_neg * ct (1 x 1) mod q
+	// Compute nu = sk_neg * ct (1 x 1) mod q
 	nu := matrix.MultiplyMatricesParallel(sk_neg, ct, par.Q)
 	nuVal := new(big.Int).Set(nu[0][0])
 
-	// 4. Recover plaintext: round nu / delta to nearest integer, then mod p
+	// Recover plaintext: round nu / delta to nearest integer, then mod p
 	qdiv := matrix.RoundDiv(nuVal, delta)
 	mu := new(big.Int).Mod(qdiv, par.P)
 
@@ -417,22 +421,22 @@ func Dec(par Parameters, sk, ct matrix.BigIntMatrix) *big.Int {
 // Performs anamorphic decryption of a ciphertext.
 // It recovers anamorphic message mu_hat from the anamorphic ciphertext act.s
 func ADec(par Parameters, dk DoubleKey, tk, act matrix.BigIntMatrix) matrix.BigIntMatrix {
-	// 1. Compute delta = ceil(q / p)
+	// Compute delta = ceil(q / p)
 	delta := new(big.Int).Div(par.Q, par.P)
 	if new(big.Int).Mod(par.Q, par.P).Cmp(big.NewInt(0)) != 0 {
 		delta = new(big.Int).Add(delta, big.NewInt(1)) // ceiling
 	}
 
-	// 2. Build extended matrix [tk | 0] (k x (m+1))
+	// Build extended matrix [tk | 0] (k x (m+1))
 	TeExt := make(matrix.BigIntMatrix, dk.K)
 	for i := 0; i < dk.K; i++ {
 		TeExt[i] = append(tk[i], big.NewInt(0)) // append zero col
 	}
 
-	// 3. Compute nu_hat = TeExt * act mod q
+	// Compute nu_hat = TeExt * act mod q
 	nu_hat := matrix.MultiplyMatricesParallel(TeExt, act, par.Q)
 
-	// 4. Recover mu_hat
+	// Recover mu_hat
 	muHat := make(matrix.BigIntMatrix, len(nu_hat))
 	for i := 0; i < len(nu_hat); i++ {
 		muHat[i] = make([]*big.Int, len(nu_hat[0]))

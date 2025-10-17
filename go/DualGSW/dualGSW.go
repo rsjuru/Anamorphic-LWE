@@ -57,9 +57,9 @@ func genParameters(lam int) Parameters {
 	// Define key dimensions and plaintext modulus
 	n := lam
 	p := big.NewInt(256) // plaintext modulus
-	q := new(big.Int).Lsh(big.NewInt(1), 18)
+	q := new(big.Int).Lsh(big.NewInt(1), 15)
 	k := int(math.Ceil(math.Log2(float64(q.Int64()))))
-	m := 5 * n
+	m := 2 * n
 
 	// Randomize n0 within safe bounds
 	upperLimit := int(math.Floor(float64(m)/2.0 - math.Ceil(math.Sqrt(float64(lam*m)/2.0))))

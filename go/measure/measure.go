@@ -47,8 +47,8 @@ func Measure(op func(lam int) error, runs int, lam int) Metrics {
 
 	// Return average performance metrics over all runs
 	return Metrics{
-		AvgLatencyMs:   totalTime / float64(int64(runs)), // Average latency in milliseconds
-		AvgHeapBytes:   totalBytes / uint64(runs),        // Average heap usage in bytes
-		AvgAllocsPerOp: allocs,                           // Average allocations per operation
+		AvgLatencyMs:   totalTime / float64(int64(runs)) / 1000,   // Average latency in seconds
+		AvgHeapBytes:   totalBytes / uint64(runs) / (1024 * 1024), // Average heap usage in megabytes
+		AvgAllocsPerOp: allocs,                                    // Average allocations per operation
 	}
 }

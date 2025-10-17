@@ -78,7 +78,7 @@ func main() {
 
 	// Print benchmark results in a clear format
 	fmt.Printf("Scheme: %s  | Op: %s\n", r.Scheme, r.Op)
-	fmt.Printf("Avg Latency: %.2f ms\n", r.Result.AvgLatencyMs)
-	fmt.Printf("Avg Heap Bytes: %d \n", r.Result.AvgHeapBytes)
+	fmt.Printf("Avg Latency: %.5f s\n", r.Result.AvgLatencyMs)
+	fmt.Printf("Avg Heap Megabytes: %d \n", r.Result.AvgHeapBytes)
 	fmt.Printf("Avg Allocs/Op: %.2f\n", r.Result.AvgAllocsPerOp)
 }

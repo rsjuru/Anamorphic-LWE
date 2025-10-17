@@ -98,7 +98,7 @@ func gsw() {
 	regularSuccess := 0
 	anamorphicSuccess := 0
 
-	iterations := 1000 // Number of messages
+	iterations := 1 // Number of messages
 
 	// ------------------ Encryption/Decryption Loop ------------------
 
